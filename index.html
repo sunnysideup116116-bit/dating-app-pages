@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/dating-app-pages/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Folks 深夜配對空間 — AI 配對、聊天與社群動態">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FFF8F0">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E131F">
+  <meta name="theme-color" content="#FFF8F0">
+
+  <!-- iOS PWA meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Folks">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <!-- Google Fonts Preload -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <title>Folks</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --app-bg: #FFF8F0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --app-bg: #0E131F;
+      }
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      background-color: var(--app-bg);
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    flutter-view {
+      width: 100% !important;
+      height: 100% !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+    }
+    /* Flutter Web sizes its editable textarea to the rendered input bounds.
+       Border-box keeps the browser's native padding/border inside that size
+       instead of making the active editor 6px taller and wider. */
+    flutter-view textarea {
+      box-sizing: border-box !important;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+  <script>
+    // FlutterFire's current Web getToken API cannot pass a custom service
+    // worker registration. This bridge does so explicitly, which is required
+    // when the deployed app lives below /dating-app-pages/ instead of /.
+    window.folksWebPush = (function () {
+      const firebaseConfig = {
+        apiKey: 'AIzaSyAlDuYjKw2NvMNUAGbG_lEEMdYqckZFm4k',
+        appId: '1:646275855157:web:e0de223894b88e5f7e927c',
+        messagingSenderId: '646275855157',
+        projectId: 'mis-project-753b3',
+        authDomain: 'mis-project-753b3.firebaseapp.com',
+        storageBucket: 'mis-project-753b3.firebasestorage.app',
+        measurementId: 'G-69FVLMD7CW',
+      };
+      let messaging = null;
+      let registration = null;
+      let currentToken = null;
+      let messageHandler = null;
+      let clickHandler = null;
+      let pendingClick = null;
+      let visibilityHandler = null;
+      let foregroundBound = false;
+
+      function appBase() {
+        return new URL(document.baseURI);
+      }
+
+      function waitForActive(workerRegistration) {
+        if (workerRegistration.active) return Promise.resolve(workerRegistration);
+        const worker = workerRegistration.installing || workerRegistration.waiting;
+        if (!worker) return Promise.resolve(workerRegistration);
+        return new Promise(function (resolve, reject) {
+          const timeout = setTimeout(function () {
+            reject(new Error('FCM service worker activation timed out'));
+          }, 10000);
+          worker.addEventListener('statechange', function () {
+            if (worker.state === 'activated') {
+              clearTimeout(timeout);
+              resolve(workerRegistration);
+            }
+          });
+        });
+      }
+
+      async function ensureMessaging() {
+        if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+          throw new Error('Web Push is not supported by this browser');
+        }
+        if (!registration) {
+          const base = appBase();
+          const scriptUrl = new URL('firebase-messaging-sw.js', base);
+          const scopeUrl = new URL('firebase-cloud-messaging-push-scope/', base);
+          registration = await navigator.serviceWorker.register(scriptUrl, {
+            scope: scopeUrl.pathname,
+          });
+          await waitForActive(registration);
+        }
+        if (!messaging) {
+          let app;
+          try {
+            app = firebase.app('folks-web-push');
+          } catch (_) {
+            app = firebase.initializeApp(firebaseConfig, 'folks-web-push');
+          }
+          messaging = app.messaging();
+        }
+        if (!foregroundBound) {
+          foregroundBound = true;
+          messaging.onMessage(function (payload) {
+            if (messageHandler) messageHandler(JSON.stringify(payload || {}));
+          });
+        }
+        return messaging;
+      }
+
+      navigator.serviceWorker?.addEventListener('message', function (event) {
+        if (event.data?.type !== 'folks-notification-click') return;
+        const payload = event.data.data || {};
+        if (clickHandler) clickHandler(JSON.stringify(payload));
+        else pendingClick = payload;
+      });
+      function publishVisibility(visible) {
+        if (visibilityHandler) visibilityHandler(visible);
+      }
+      document.addEventListener('visibilitychange', function () {
+        publishVisibility(document.visibilityState === 'visible');
+      });
+      // Some embedded browsers do not update document.visibilityState when
+      // another tab or window receives focus. Blur/focus keeps exact-chat
+      // suppression honest in those environments as well.
+      window.addEventListener('blur', function () {
+        publishVisibility(false);
+      });
+      window.addEventListener('focus', function () {
+        publishVisibility(document.visibilityState === 'visible');
+      });
+
+      const initialParams = new URL(window.location.href).searchParams;
+      if (initialParams.has('push_chat_surface')) {
+        pendingClick = {};
+        for (const key of [
+          'chat_surface',
+          'chat_conversation_id',
+          'chat_contact_id',
+          'chat_contact_name',
+          'chat_ai_room_id',
+          'chat_message_kind',
+          'chat_sender_id',
+        ]) {
+          pendingClick[key] = initialParams.get('push_' + key) || '';
+        }
+        for (const key of Array.from(initialParams.keys())) {
+          if (key.startsWith('push_')) initialParams.delete(key);
+        }
+        const clean = new URL(window.location.href);
+        clean.search = initialParams.toString();
+        window.history.replaceState({}, '', clean.toString());
+      }
+
+      return {
+        getToken: async function (vapidKey) {
+          const instance = await ensureMessaging();
+          currentToken = await instance.getToken({
+            vapidKey: vapidKey,
+            serviceWorkerRegistration: registration,
+          });
+          return currentToken || '';
+        },
+        deleteToken: async function () {
+          if (!messaging) return;
+          try {
+            await messaging.deleteToken();
+          } catch (_) {
+            if (currentToken) await messaging.deleteToken(currentToken);
+          }
+          currentToken = null;
+        },
+        setMessageHandler: function (handler) {
+          messageHandler = handler;
+        },
+        setClickHandler: function (handler) {
+          clickHandler = handler;
+          if (pendingClick) {
+            clickHandler(JSON.stringify(pendingClick));
+            pendingClick = null;
+          }
+        },
+        setVisibilityHandler: function (handler) {
+          visibilityHandler = handler;
+          publishVisibility(document.visibilityState === 'visible');
+        },
+      };
+    })();
+  </script>
+  <script src="cache_bridge.js"></script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
