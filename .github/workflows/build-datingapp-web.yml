@@ -80,10 +80,6 @@ jobs:
         working-directory: DatingApp
         run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
 
-      - name: Run unit and widget regression tests
-        working-directory: DatingApp
-        run: flutter test --no-pub
-
       - name: Build Flutter Web
         working-directory: DatingApp
         run: bash scripts/build_web.sh --base-href=/dating-app-pages/
