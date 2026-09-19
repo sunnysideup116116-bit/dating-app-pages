@@ -42,12 +42,24 @@ jobs:
           echo "ref=$source_ref" >> "$GITHUB_OUTPUT"
           echo "Building edwinchu0711/DatingApp at $source_ref"
 
+      - name: Validate DatingApp source token
+        env:
+          DATINGAPP_READ_TOKEN: ${{ secrets.DATINGAPP_READ_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATINGAPP_READ_TOKEN:-}" ]]; then
+            echo "::error::Missing required secret DATINGAPP_READ_TOKEN. Grant it read-only access to edwinchu0711/DatingApp."
+            exit 1
+          fi
+
       - name: Checkout DatingApp source
         uses: actions/checkout@v4
         with:
           repository: edwinchu0711/DatingApp
           ref: ${{ steps.source.outputs.ref }}
           path: DatingApp
+          token: ${{ secrets.DATINGAPP_READ_TOKEN }}
           fetch-depth: 1
           persist-credentials: false
 
